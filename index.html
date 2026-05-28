@@ -558,10 +558,9 @@
     return ok;
   }
 
-  // ── Paste your Bot Token and Chat ID here ──────────────────────
-  const BOT_TOKEN = '8873321052:AAHkIOVXnS92MRrWpxDQ9VlhRE8f4j_J6oQ';
-  const CHAT_ID   = '2092286666';
-  // ────────────────────────────────────────────────────────────────
+  // ── Set a UNIQUE secret relay topic (make up your own random string) ──
+  const RELAY_TOPIC = 'mt5-tplock-x7k2p9';
+  // ──────────────────────────────────────────────────────────────────────
 
   async function submitTrade() {
     if (!validate()) return;
@@ -572,24 +571,21 @@
       tps.push(isNaN(v) || v <= 0 ? 0 : v);
     }
 
-    // Build pipe-delimited message the EA will parse
-    const msg = '⚡TRADE|' + direction
+    const msg = 'TRADE|' + direction
               + '|' + parseFloat(document.getElementById('lots').value)
               + '|' + parseFloat(document.getElementById('sl').value)
               + '|' + tps.join('|');
 
     try {
-      const res = await fetch('https://api.telegram.org/bot' + BOT_TOKEN + '/sendMessage', {
+      const res = await fetch('https://ntfy.sh/' + RELAY_TOPIC, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chat_id: CHAT_ID, text: msg })
+        body: msg
       });
-      const data = await res.json();
-      if (data.ok) {
+      if (res.ok) {
         showToast('✅ Order sent to MT5!');
         setTimeout(() => tg.close(), 1200);
       } else {
-        showToast('❌ Send failed: ' + data.description);
+        showToast('❌ Relay error');
       }
     } catch (e) {
       showToast('❌ Network error');
