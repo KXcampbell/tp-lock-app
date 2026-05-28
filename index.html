@@ -558,7 +558,12 @@
     return ok;
   }
 
-  function submitTrade() {
+  // ── Paste your Bot Token and Chat ID here ──────────────────────
+  const BOT_TOKEN = '8873321052:AAHkIOVXnS92MRrWpxDQ9VlhRE8f4j_J6oQ';
+  const CHAT_ID   = '2092286666';
+  // ────────────────────────────────────────────────────────────────
+
+  async function submitTrade() {
     if (!validate()) return;
 
     const tps = [];
@@ -567,19 +572,28 @@
       tps.push(isNaN(v) || v <= 0 ? 0 : v);
     }
 
-    const payload = {
-      direction: direction,
-      lots:      parseFloat(document.getElementById('lots').value),
-      sl:        parseFloat(document.getElementById('sl').value),
-      tp:        tps
-    };
+    // Build pipe-delimited message the EA will parse
+    const msg = '⚡TRADE|' + direction
+              + '|' + parseFloat(document.getElementById('lots').value)
+              + '|' + parseFloat(document.getElementById('sl').value)
+              + '|' + tps.join('|');
 
-    // Send data back to the EA via Telegram
-    tg.sendData(JSON.stringify(payload));
-    showToast('✅ Order sent to MT5!');
-
-    // Small delay then close
-    setTimeout(() => tg.close(), 1200);
+    try {
+      const res = await fetch('https://api.telegram.org/bot' + BOT_TOKEN + '/sendMessage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: CHAT_ID, text: msg })
+      });
+      const data = await res.json();
+      if (data.ok) {
+        showToast('✅ Order sent to MT5!');
+        setTimeout(() => tg.close(), 1200);
+      } else {
+        showToast('❌ Send failed: ' + data.description);
+      }
+    } catch (e) {
+      showToast('❌ Network error');
+    }
   }
 
   function showToast(msg) {
