@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Trade Panel</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #0a0e1a;
+    --surface:   #111827;
+    --border:    #1e2d45;
+    --muted:     #2a3a52;
+    --text:      #e2eaf6;
+    --sub:       #6b82a0;
+    --buy:       #00e59b;
+    --buy-dim:   #003d29;
+    --sell:      #ff4d6d;
+    --sell-dim:  #3d0014;
+    --gold:      #f5c842;
+    --gold-dim:  #3a2e00;
+    --accent:    #3d8bfe;
+    --radius:    12px;
+    --mono:      'Space Mono', monospace;
+    --sans:      'DM Sans', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 16px;
+    overflow-x: hidden;
+  }
+
+  /* ── Header ── */
+  .header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .header-icon {
+    width: 36px; height: 36px;
+    background: linear-gradient(135deg, var(--gold), #e8a500);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+    box-shadow: 0 0 16px rgba(245,200,66,0.3);
+  }
+  .header-title { font-size: 18px; font-weight: 600; letter-spacing: -0.3px; }
+  .header-sub   { font-size: 11px; color: var(--sub); font-family: var(--mono); margin-top: 1px; }
+  .live-dot {
+    margin-left: auto;
+    display: flex; align-items: center; gap: 5px;
+    font-size: 11px; color: var(--buy); font-family: var(--mono);
+  }
+  .live-dot::before {
+    content: '';
+    width: 7px; height: 7px;
+    background: var(--buy);
+    border-radius: 50%;
+    animation: pulse 1.5s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+  /* ── Section labels ── */
+  .label {
+    font-size: 10px;
+    font-family: var(--mono);
+    color: var(--sub);
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    margin-bottom: 8px;
+  }
+
+  /* ── Card ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px;
+    margin-bottom: 14px;
+  }
+
+  /* ── Buy/Sell toggle ── */
+  .direction-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .dir-btn {
+    padding: 14px 0;
+    border: 2px solid var(--border);
+    border-radius: var(--radius);
+    background: transparent;
+    color: var(--sub);
+    font-family: var(--mono);
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: all .2s ease;
+    position: relative;
+    overflow: hidden;
+  }
+  .dir-btn .dir-icon { font-size: 18px; display: block; margin-bottom: 2px; }
+  .dir-btn:active { transform: scale(0.97); }
+
+  .dir-btn.buy.active {
+    border-color: var(--buy);
+    background: var(--buy-dim);
+    color: var(--buy);
+    box-shadow: 0 0 20px rgba(0,229,155,0.2);
+  }
+  .dir-btn.sell.active {
+    border-color: var(--sell);
+    background: var(--sell-dim);
+    color: var(--sell);
+    box-shadow: 0 0 20px rgba(255,77,109,0.2);
+  }
+
+  /* ── Inputs ── */
+  .input-row { margin-bottom: 12px; }
+  .input-row:last-child { margin-bottom: 0; }
+  .input-row .label { margin-bottom: 6px; }
+
+  input[type="number"] {
+    width: 100%;
+    background: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 14px;
+    outline: none;
+    transition: border-color .2s, box-shadow .2s;
+    -moz-appearance: textfield;
+  }
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
+  input[type="number"]:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(61,139,254,0.15);
+  }
+  input[type="number"].tp-input:focus {
+    border-color: var(--gold);
+    box-shadow: 0 0 0 3px rgba(245,200,66,0.1);
+  }
+  input::placeholder { color: var(--sub); }
+
+  /* ── TP Grid ── */
+  .tp-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .tp-item { position: relative; }
+  .tp-badge {
+    position: absolute;
+    top: 50%; right: 10px;
+    transform: translateY(-50%);
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--gold);
+    background: var(--gold-dim);
+    padding: 2px 6px;
+    border-radius: 4px;
+    pointer-events: none;
+  }
+  .tp-item input { padding-right: 42px; }
+
+  /* ── TP header row ── */
+  .tp-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  .tp-header .label { margin-bottom: 0; }
+  .tp-note {
+    font-size: 10px;
+    color: var(--sub);
+    font-family: var(--mono);
+  }
+
+  /* ── Progress bar (filled TPs) ── */
+  .tp-progress {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 12px;
+  }
+  .tp-pip {
+    flex: 1; height: 3px;
+    border-radius: 2px;
+    background: var(--border);
+    transition: background .2s;
+  }
+  .tp-pip.filled { background: var(--gold); }
+
+  /* ── Submit button ── */
+  .submit-btn {
+    width: 100%;
+    padding: 16px;
+    border: none;
+    border-radius: var(--radius);
+    font-family: var(--mono);
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: all .2s ease;
+    margin-top: 6px;
+    position: relative;
+    overflow: hidden;
+  }
+  .submit-btn::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(255,255,255,0.08);
+    opacity: 0;
+    transition: opacity .15s;
+  }
+  .submit-btn:active::after { opacity: 1; }
+  .submit-btn:active { transform: scale(0.99); }
+
+  .submit-btn.buy-submit {
+    background: linear-gradient(135deg, #00c87a, #00e59b);
+    color: #001a11;
+    box-shadow: 0 4px 20px rgba(0,229,155,0.3);
+  }
+  .submit-btn.sell-submit {
+    background: linear-gradient(135deg, #e0003a, #ff4d6d);
+    color: #fff;
+    box-shadow: 0 4px 20px rgba(255,77,109,0.3);
+  }
+  .submit-btn.neutral-submit {
+    background: var(--muted);
+    color: var(--sub);
+    cursor: not-allowed;
+  }
+
+  /* ── Validation errors ── */
+  .field-err {
+    font-size: 11px;
+    color: var(--sell);
+    font-family: var(--mono);
+    margin-top: 4px;
+    display: none;
+  }
+  .field-err.show { display: block; }
+
+  /* ── Summary preview ── */
+  .summary {
+    background: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    margin-top: 10px;
+    display: none;
+  }
+  .summary.show { display: block; }
+  .summary-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    margin-bottom: 6px;
+    font-family: var(--mono);
+  }
+  .summary-row:last-child { margin-bottom: 0; }
+  .summary-row .sk { color: var(--sub); }
+  .summary-row .sv { color: var(--text); }
+  .summary-row .sv.buy-color  { color: var(--buy); }
+  .summary-row .sv.sell-color { color: var(--sell); }
+
+  /* ── Toast ── */
+  .toast {
+    position: fixed;
+    bottom: 24px; left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 30px;
+    padding: 10px 20px;
+    font-size: 13px;
+    font-family: var(--mono);
+    white-space: nowrap;
+    transition: transform .3s cubic-bezier(0.34,1.56,0.64,1);
+    z-index: 999;
+    pointer-events: none;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+
+  /* ── Divider ── */
+  .divider {
+    height: 1px;
+    background: var(--border);
+    margin: 12px 0;
+  }
+
+  /* ── Lot quick picks ── */
+  .quick-picks {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+    flex-wrap: wrap;
+  }
+  .qp-btn {
+    padding: 5px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--muted);
+    color: var(--sub);
+    font-family: var(--mono);
+    font-size: 11px;
+    cursor: pointer;
+    transition: all .15s;
+  }
+  .qp-btn:hover, .qp-btn:active {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-icon">⚡</div>
+  <div>
+    <div class="header-title">Trade Panel</div>
+    <div class="header-sub">TP LOCK EXTENSION v2</div>
+  </div>
+  <div class="live-dot">LIVE</div>
+</div>
+
+<!-- Direction -->
+<div class="card">
+  <div class="label">Direction</div>
+  <div class="direction-row">
+    <button class="dir-btn buy" id="buyBtn" onclick="setDirection('BUY')">
+      <span class="dir-icon">▲</span>BUY
+    </button>
+    <button class="dir-btn sell" id="sellBtn" onclick="setDirection('SELL')">
+      <span class="dir-icon">▼</span>SELL
+    </button>
+  </div>
+</div>
+
+<!-- Lot Size & SL -->
+<div class="card">
+  <div class="input-row">
+    <div class="label">Lot Size</div>
+    <input type="number" id="lots" placeholder="0.01" step="0.01" min="0.01" oninput="updateSummary()">
+    <div class="quick-picks">
+      <button class="qp-btn" onclick="setLots(0.01)">0.01</button>
+      <button class="qp-btn" onclick="setLots(0.05)">0.05</button>
+      <button class="qp-btn" onclick="setLots(0.10)">0.10</button>
+      <button class="qp-btn" onclick="setLots(0.25)">0.25</button>
+      <button class="qp-btn" onclick="setLots(0.50)">0.50</button>
+      <button class="qp-btn" onclick="setLots(1.00)">1.00</button>
+    </div>
+    <div class="field-err" id="lots-err">Enter a valid lot size</div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="input-row">
+    <div class="label">Stop Loss (Price)</div>
+    <input type="number" id="sl" placeholder="e.g. 2310.00" step="0.01" oninput="updateSummary()">
+    <div class="field-err" id="sl-err">Enter a valid stop loss price</div>
+  </div>
+</div>
+
+<!-- Take Profits -->
+<div class="card">
+  <div class="tp-header">
+    <div class="label">Take Profit Levels</div>
+    <div class="tp-note" id="tp-count">0 / 8 set</div>
+  </div>
+
+  <div class="tp-progress" id="tp-progress">
+    <div class="tp-pip" id="pip0"></div>
+    <div class="tp-pip" id="pip1"></div>
+    <div class="tp-pip" id="pip2"></div>
+    <div class="tp-pip" id="pip3"></div>
+    <div class="tp-pip" id="pip4"></div>
+    <div class="tp-pip" id="pip5"></div>
+    <div class="tp-pip" id="pip6"></div>
+    <div class="tp-pip" id="pip7"></div>
+  </div>
+
+  <div class="tp-grid">
+    <div class="tp-item">
+      <input class="tp-input" type="number" id="tp1" placeholder="TP 1" step="0.01" oninput="onTPInput()">
+      <span class="tp-badge">T1</span>
+    </div>
+    <div class="tp-item">
+      <input class="tp-input" type="number" id="tp2" placeholder="TP 2" step="0.01" oninput="onTPInput()">
+      <span class="tp-badge">T2</span>
+    </div>
+    <div class="tp-item">
+      <input class="tp-input" type="number" id="tp3" placeholder="TP 3" step="0.01" oninput="onTPInput()">
+      <span class="tp-badge">T3</span>
+    </div>
+    <div class="tp-item">
+      <input class="tp-input" type="number" id="tp4" placeholder="TP 4" step="0.01" oninput="onTPInput()">
+      <span class="tp-badge">T4</span>
+    </div>
+    <div class="tp-item">
+      <input class="tp-input" type="number" id="tp5" placeholder="TP 5" step="0.01" oninput="onTPInput()">
+      <span class="tp-badge">T5</span>
+    </div>
+    <div class="tp-item">
+      <input class="tp-input" type="number" id="tp6" placeholder="TP 6" step="0.01" oninput="onTPInput()">
+      <span class="tp-badge">T6</span>
+    </div>
+    <div class="tp-item">
+      <input class="tp-input" type="number" id="tp7" placeholder="TP 7" step="0.01" oninput="onTPInput()">
+      <span class="tp-badge">T7</span>
+    </div>
+    <div class="tp-item">
+      <input class="tp-input" type="number" id="tp8" placeholder="TP 8" step="0.01" oninput="onTPInput()">
+      <span class="tp-badge">T8</span>
+    </div>
+  </div>
+  <div class="field-err" id="tp-err" style="margin-top:8px">At least TP1 is required</div>
+</div>
+
+<!-- Summary -->
+<div class="summary" id="summary">
+  <div class="label" style="margin-bottom:10px">Order Summary</div>
+  <div class="summary-row"><span class="sk">Direction</span><span class="sv" id="sum-dir">—</span></div>
+  <div class="summary-row"><span class="sk">Lot Size</span><span class="sv" id="sum-lots">—</span></div>
+  <div class="summary-row"><span class="sk">Stop Loss</span><span class="sv" id="sum-sl">—</span></div>
+  <div class="summary-row"><span class="sk">TP Levels</span><span class="sv" id="sum-tps">—</span></div>
+</div>
+
+<!-- Submit -->
+<button class="submit-btn neutral-submit" id="submitBtn" onclick="submitTrade()">
+  SELECT DIRECTION TO CONTINUE
+</button>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+  const tg = window.Telegram.WebApp;
+  tg.ready();
+  tg.expand();
+
+  // Apply Telegram theme if available
+  if (tg.colorScheme === 'light') {
+    document.documentElement.style.setProperty('--bg','#f0f4fa');
+    document.documentElement.style.setProperty('--surface','#ffffff');
+    document.documentElement.style.setProperty('--border','#d0daea');
+    document.documentElement.style.setProperty('--muted','#e4eaf5');
+    document.documentElement.style.setProperty('--text','#1a2540');
+    document.documentElement.style.setProperty('--sub','#6b82a0');
+  }
+
+  let direction = null;
+
+  function setDirection(dir) {
+    direction = dir;
+    document.getElementById('buyBtn').classList.toggle('active', dir === 'BUY');
+    document.getElementById('sellBtn').classList.toggle('active', dir === 'SELL');
+    updateSubmitBtn();
+    updateSummary();
+  }
+
+  function setLots(v) {
+    document.getElementById('lots').value = v;
+    updateSummary();
+  }
+
+  function onTPInput() {
+    updateTPProgress();
+    updateSummary();
+  }
+
+  function updateTPProgress() {
+    let count = 0;
+    for (let i = 1; i <= 8; i++) {
+      const val = parseFloat(document.getElementById('tp' + i).value);
+      const filled = !isNaN(val) && val > 0;
+      document.getElementById('pip' + (i-1)).classList.toggle('filled', filled);
+      if (filled) count++;
+    }
+    document.getElementById('tp-count').textContent = count + ' / 8 set';
+  }
+
+  function updateSummary() {
+    const lots = parseFloat(document.getElementById('lots').value);
+    const sl   = parseFloat(document.getElementById('sl').value);
+    const tps  = [];
+    for (let i = 1; i <= 8; i++) {
+      const v = parseFloat(document.getElementById('tp' + i).value);
+      if (!isNaN(v) && v > 0) tps.push('TP' + i + ': ' + v.toFixed(2));
+    }
+
+    const hasSummary = direction && !isNaN(lots) && lots > 0 && !isNaN(sl) && sl > 0 && tps.length > 0;
+    document.getElementById('summary').classList.toggle('show', hasSummary);
+
+    if (hasSummary) {
+      const dirEl = document.getElementById('sum-dir');
+      dirEl.textContent = direction;
+      dirEl.className   = 'sv ' + (direction === 'BUY' ? 'buy-color' : 'sell-color');
+      document.getElementById('sum-lots').textContent = lots + ' lots';
+      document.getElementById('sum-sl').textContent   = sl.toFixed(2);
+      document.getElementById('sum-tps').textContent  = tps.join('  ');
+    }
+    updateSubmitBtn();
+  }
+
+  function updateSubmitBtn() {
+    const btn  = document.getElementById('submitBtn');
+    const lots = parseFloat(document.getElementById('lots').value);
+    const sl   = parseFloat(document.getElementById('sl').value);
+    const tp1  = parseFloat(document.getElementById('tp1').value);
+    const ready = direction && !isNaN(lots) && lots > 0 && !isNaN(sl) && sl > 0 && !isNaN(tp1) && tp1 > 0;
+
+    btn.className = 'submit-btn ' + (
+      !direction      ? 'neutral-submit' :
+      !ready          ? 'neutral-submit' :
+      direction==='BUY' ? 'buy-submit'   : 'sell-submit'
+    );
+    btn.textContent = !direction ? 'SELECT DIRECTION TO CONTINUE' :
+                      !ready     ? 'FILL REQUIRED FIELDS' :
+                      '▶  PLACE ' + direction + ' ORDER';
+  }
+
+  function validate() {
+    let ok = true;
+    const lots = parseFloat(document.getElementById('lots').value);
+    const sl   = parseFloat(document.getElementById('sl').value);
+    const tp1  = parseFloat(document.getElementById('tp1').value);
+
+    const lotsErr = document.getElementById('lots-err');
+    const slErr   = document.getElementById('sl-err');
+    const tpErr   = document.getElementById('tp-err');
+
+    lotsErr.classList.toggle('show', isNaN(lots) || lots <= 0);
+    slErr.classList.toggle('show',   isNaN(sl)   || sl   <= 0);
+    tpErr.classList.toggle('show',   isNaN(tp1)  || tp1  <= 0);
+
+    if (isNaN(lots) || lots <= 0) ok = false;
+    if (isNaN(sl)   || sl   <= 0) ok = false;
+    if (isNaN(tp1)  || tp1  <= 0) ok = false;
+    if (!direction) { showToast('❗ Choose BUY or SELL'); ok = false; }
+    return ok;
+  }
+
+  function submitTrade() {
+    if (!validate()) return;
+
+    const tps = [];
+    for (let i = 1; i <= 8; i++) {
+      const v = parseFloat(document.getElementById('tp' + i).value);
+      tps.push(isNaN(v) || v <= 0 ? 0 : v);
+    }
+
+    const payload = {
+      direction: direction,
+      lots:      parseFloat(document.getElementById('lots').value),
+      sl:        parseFloat(document.getElementById('sl').value),
+      tp:        tps
+    };
+
+    // Send data back to the EA via Telegram
+    tg.sendData(JSON.stringify(payload));
+    showToast('✅ Order sent to MT5!');
+
+    // Small delay then close
+    setTimeout(() => tg.close(), 1200);
+  }
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2500);
+  }
+
+  // Init
+  updateTPProgress();
+  updateSubmitBtn();
+</script>
+</body>
+</html>
