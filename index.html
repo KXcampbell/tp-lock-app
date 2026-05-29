@@ -134,11 +134,11 @@
 <div class="header">
   <div class="logo">TX</div>
   <div><h1>Trade Terminal</h1><div class="tag">TP LOCK · LIVE</div></div>
-  <div class="conn" id="conn"><span class="dot"></span><span id="connTxt">CONNECTING</span></div>
+  <div class="conn" id="conn"><span class="dot"></span><span id="connTxt">PRICE…</span></div>
 </div>
 <div class="ticker">
   <div><div class="sym" id="tkSym">— — —</div><div class="px stale" id="tkPx">----.--</div></div>
-  <div class="meta" id="tkMeta"><div class="waiting">waiting for EA…</div></div>
+  <div class="meta" id="tkMeta"><div class="waiting">loading price…</div></div>
 </div>
 <div class="recall" id="recall"><div class="txt" id="recallTxt"></div><button onclick="recallLast()">Recall</button></div>
 <div class="card">
@@ -221,24 +221,42 @@
     const p=document.createElement('div');p.className='pip';p.id=`pip${i}`;pips.appendChild(p);
   }
 
-  function connectPrice(){
-    const es=new EventSource('https://ntfy.sh/'+PRICE_TOPIC+'/sse');
-    es.onmessage=(e)=>{
-      try{
-        const d=JSON.parse(e.data);
-        if(d.event!=='message'||!d.message)return;
+  let priceTried=false;
+  async function pollPriceOnce(){
+    try{
+      const ctrl=new AbortController();
+      const to=setTimeout(()=>ctrl.abort(),3500);
+      const r=await fetch('https://ntfy.sh/'+PRICE_TOPIC+'/json?poll=1',{signal:ctrl.signal});
+      clearTimeout(to);
+      const txt=await r.text();
+      const lines=txt.trim().split('\n').filter(Boolean);
+      // take the LAST PRICE message
+      for(let i=lines.length-1;i>=0;i--){
+        const d=JSON.parse(lines[i]);
+        if(d.event!=='message'||!d.message)continue;
         const f=d.message.split('|');
-        if(f[0]!=='PRICE')return;
+        if(f[0]!=='PRICE')continue;
         live.sym=f[1];live.bid=parseFloat(f[2]);live.ask=parseFloat(f[3]);
         live.digits=parseInt(f[4]);live.point=parseFloat(f[5]);live.stops=parseInt(f[6]);
         live.ts=Date.now();renderTicker();refresh();setConn(true);
-      }catch(err){}
-    };
-    es.onerror=()=>{setConn(false);};
+        return true;
+      }
+      return false;
+    }catch(e){ return false; }
+  }
+  async function connectPrice(){
+    const ok=await pollPriceOnce();
+    priceTried=true;
+    if(!ok) setConn(false);
+    setInterval(pollPriceOnce, 2500);  // keep refreshing
   }
   function setConn(ok){
     const c=document.getElementById('conn');c.classList.toggle('live',ok);
-    document.getElementById('connTxt').textContent=ok?'LIVE':'OFFLINE';
+    document.getElementById('connTxt').textContent=ok?'PRICE LIVE':'PRICE N/A';
+    if(!ok && priceTried){
+      const m=document.getElementById('tkMeta');
+      if(m && !live.bid) m.innerHTML='<div class="waiting">price feed blocked —<br>trading still works ✓</div>';
+    }
   }
   function renderTicker(){
     document.getElementById('tkSym').textContent=live.sym||'— — —';
