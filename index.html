@@ -439,4 +439,445 @@
   connectPrice();showRecall();refresh();
 </script>
 </body>
+</html><!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Trade Terminal</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Sora:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#06080f; --bg2:#0a0e1a; --surface:#0f1524; --surface2:#141b2e;
+    --border:#1c2740; --border2:#28354f; --muted:#1a2336;
+    --text:#eaf1ff; --sub:#69809f; --sub2:#46597a;
+    --buy:#00e7a3; --buy-glow:rgba(0,231,163,0.25); --buy-dim:#052e22;
+    --sell:#ff446a; --sell-glow:rgba(255,68,106,0.25); --sell-dim:#2e0512;
+    --gold:#ffcc4d; --gold-dim:#2e2400; --accent:#4d8cff; --warn:#ffb020;
+    --radius:14px; --mono:'JetBrains Mono',monospace; --sans:'Sora',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+  html,body{overscroll-behavior:none;}
+  body{font-family:var(--sans);
+    background:radial-gradient(1200px 600px at 50% -10%,rgba(77,140,255,0.08),transparent 60%),
+      radial-gradient(800px 400px at 100% 100%,rgba(0,231,163,0.05),transparent 55%),var(--bg);
+    color:var(--text);min-height:100vh;padding:14px 14px 28px;overflow-x:hidden;}
+  .header{display:flex;align-items:center;gap:11px;margin-bottom:14px;}
+  .logo{width:38px;height:38px;background:linear-gradient(140deg,#4d8cff,#00e7a3);border-radius:11px;
+    display:grid;place-items:center;font-family:var(--mono);font-weight:800;font-size:17px;color:#04111a;
+    box-shadow:0 6px 20px rgba(77,140,255,0.35);}
+  .header h1{font-size:17px;font-weight:700;letter-spacing:-0.3px;}
+  .header .tag{font-family:var(--mono);font-size:10px;color:var(--sub2);letter-spacing:1.5px;margin-top:1px;}
+  .conn{margin-left:auto;display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10px;
+    color:var(--sub);background:var(--surface);border:1px solid var(--border);padding:5px 9px;border-radius:20px;}
+  .conn .dot{width:7px;height:7px;border-radius:50%;background:var(--sub2);transition:background .3s;}
+  .conn.live .dot{background:var(--buy);box-shadow:0 0 8px var(--buy);animation:pulse 1.6s infinite;}
+  .conn.live{color:var(--buy);}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+  .ticker{background:linear-gradient(180deg,var(--surface2),var(--surface));border:1px solid var(--border2);
+    border-radius:var(--radius);padding:13px 16px;margin-bottom:13px;display:flex;align-items:center;
+    justify-content:space-between;position:relative;overflow:hidden;}
+  .ticker::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent);}
+  .ticker .sym{font-family:var(--mono);font-size:11px;color:var(--sub);letter-spacing:.5px;}
+  .ticker .px{font-family:var(--mono);font-weight:800;font-size:26px;letter-spacing:-0.5px;line-height:1;
+    margin-top:3px;transition:color .15s;}
+  .ticker .px.up{color:var(--buy);}.ticker .px.down{color:var(--sell);}.ticker .px.stale{color:var(--sub);}
+  .ticker .meta{text-align:right;font-family:var(--mono);font-size:10px;color:var(--sub2);}
+  .ticker .meta .bidask{color:var(--sub);font-size:11px;margin-bottom:2px;}
+  .ticker .waiting{font-family:var(--mono);font-size:12px;color:var(--sub2);}
+  .label{font-family:var(--mono);font-size:10px;color:var(--sub);text-transform:uppercase;
+    letter-spacing:1.4px;margin-bottom:7px;display:flex;align-items:center;gap:6px;}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+    padding:14px;margin-bottom:12px;}
+  .dir-row{display:grid;grid-template-columns:1fr 1fr;gap:9px;}
+  .dir-btn{padding:15px 0;border:1.5px solid var(--border2);border-radius:12px;background:var(--surface2);
+    color:var(--sub);font-family:var(--mono);font-size:15px;font-weight:700;letter-spacing:1.5px;
+    cursor:pointer;transition:all .18s ease;position:relative;}
+  .dir-btn .ic{font-size:16px;margin-right:4px;}
+  .dir-btn:active{transform:scale(0.97);}
+  .dir-btn.buy.on{border-color:var(--buy);background:var(--buy-dim);color:var(--buy);
+    box-shadow:0 0 24px var(--buy-glow),inset 0 0 20px rgba(0,231,163,0.05);}
+  .dir-btn.sell.on{border-color:var(--sell);background:var(--sell-dim);color:var(--sell);
+    box-shadow:0 0 24px var(--sell-glow),inset 0 0 20px rgba(255,68,106,0.05);}
+  .field{margin-bottom:13px;}.field:last-child{margin-bottom:0;}
+  .inwrap{position:relative;}
+  input[type="number"],input[type="text"]{width:100%;background:var(--muted);border:1.5px solid var(--border);
+    border-radius:10px;padding:13px 14px;color:var(--text);font-family:var(--mono);font-size:15px;
+    outline:none;transition:border-color .18s,box-shadow .18s;-moz-appearance:textfield;}
+  input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appearance:none;}
+  input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(77,140,255,0.14);}
+  input.tp:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(255,204,77,0.12);}
+  input::placeholder{color:var(--sub2);}
+  .suffix{position:absolute;right:13px;top:50%;transform:translateY(-50%);font-family:var(--mono);
+    font-size:11px;color:var(--sub2);pointer-events:none;}
+  .hint{font-family:var(--mono);font-size:10px;margin-top:5px;min-height:13px;transition:color .2s;}
+  .hint.ok{color:var(--sub);}.hint.bad{color:var(--sell);}.hint.good{color:var(--buy);}
+  .qp{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;}
+  .qp button{padding:6px 11px;border-radius:7px;border:1px solid var(--border2);background:var(--surface2);
+    color:var(--sub);font-family:var(--mono);font-size:11px;cursor:pointer;transition:all .15s;}
+  .qp button:active{border-color:var(--accent);color:var(--accent);transform:scale(0.95);}
+  .stepper{display:flex;align-items:stretch;gap:0;}
+  .stepper button{width:48px;background:var(--surface2);border:1.5px solid var(--border);color:var(--text);
+    font-size:22px;font-family:var(--mono);cursor:pointer;transition:all .15s;display:grid;place-items:center;}
+  .stepper button:active{background:var(--accent);color:#04111a;}
+  .stepper button.minus{border-radius:10px 0 0 10px;border-right:none;}
+  .stepper button.plus{border-radius:0 10px 10px 0;border-left:none;}
+  .stepper input{border-radius:0;text-align:center;font-weight:700;font-size:17px;}
+  .tp-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;}
+  .tp-count{font-family:var(--mono);font-size:10px;color:var(--gold);background:var(--gold-dim);
+    padding:3px 8px;border-radius:5px;}
+  .ladder-inputs{display:grid;grid-template-columns:1.4fr 1fr;gap:9px;margin-bottom:11px;}
+  .li-field .li-label{font-family:var(--mono);font-size:10px;color:var(--sub);
+    text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;}
+  .ladder-preview{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;}
+  .lp-chip{font-family:var(--mono);font-size:11px;text-align:center;padding:7px 2px;
+    border-radius:7px;background:var(--surface2);border:1px solid var(--border);color:var(--sub);}
+  .lp-chip b{display:block;font-size:9px;color:var(--gold);margin-bottom:2px;}
+  .lp-chip.set{color:var(--text);border-color:var(--gold-dim);}
+  .pips{display:flex;gap:4px;margin-bottom:12px;}
+  .pip{flex:1;height:3px;border-radius:2px;background:var(--border);transition:all .25s;}
+  .pip.on{background:var(--gold);box-shadow:0 0 6px rgba(255,204,77,0.4);}
+  .tp-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+  .tp-item{position:relative;}
+  .tp-item .tag{position:absolute;right:11px;top:50%;transform:translateY(-50%);font-family:var(--mono);
+    font-size:10px;color:var(--gold);background:var(--gold-dim);padding:2px 6px;border-radius:4px;pointer-events:none;}
+  .tp-item input{padding-right:44px;}
+  .tp-item input.wrong{border-color:var(--sell);box-shadow:0 0 0 2px rgba(255,68,106,0.15);}
+  .summary{background:linear-gradient(180deg,var(--surface2),var(--surface));border:1px solid var(--border2);
+    border-radius:var(--radius);padding:14px;margin-bottom:12px;display:none;}
+  .summary.show{display:block;animation:slideup .25s ease;}
+  @keyframes slideup{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+  .srow{display:flex;justify-content:space-between;align-items:center;font-family:var(--mono);
+    font-size:12px;padding:5px 0;}
+  .srow .k{color:var(--sub);}.srow .v{color:var(--text);font-weight:500;}
+  .srow .v.buy{color:var(--buy);}.srow .v.sell{color:var(--sell);}
+  .sdiv{height:1px;background:var(--border);margin:7px 0;}
+  .submit{width:100%;padding:17px;border:none;border-radius:var(--radius);font-family:var(--mono);
+    font-size:15px;font-weight:800;letter-spacing:1px;cursor:pointer;transition:all .18s ease;
+    position:relative;overflow:hidden;}
+  .submit:active{transform:scale(0.99);}
+  .submit.idle{background:var(--muted);color:var(--sub2);cursor:not-allowed;}
+  .submit.buy{background:linear-gradient(135deg,#00c98c,#00e7a3);color:#04111a;box-shadow:0 6px 24px var(--buy-glow);}
+  .submit.sell{background:linear-gradient(135deg,#e6003f,#ff446a);color:#fff;box-shadow:0 6px 24px var(--sell-glow);}
+  .recall{display:none;align-items:center;gap:10px;background:var(--surface);border:1px dashed var(--border2);
+    border-radius:10px;padding:10px 12px;margin-bottom:12px;}
+  .recall.show{display:flex;animation:slideup .25s ease;}
+  .recall .txt{flex:1;font-family:var(--mono);font-size:11px;color:var(--sub);}
+  .recall .txt b{color:var(--text);}
+  .recall button{padding:7px 12px;border-radius:8px;border:1px solid var(--accent);
+    background:rgba(77,140,255,0.12);color:var(--accent);font-family:var(--mono);font-size:11px;
+    font-weight:600;cursor:pointer;}
+  .recall button:active{transform:scale(0.95);}
+  .field-err{font-family:var(--mono);font-size:11px;color:var(--sell);margin-top:5px;display:none;}
+  .field-err.show{display:block;}
+  .toast{position:fixed;bottom:26px;left:50%;transform:translateX(-50%) translateY(90px);
+    background:var(--surface2);border:1px solid var(--border2);border-radius:30px;padding:11px 22px;
+    font-family:var(--mono);font-size:13px;white-space:nowrap;
+    transition:transform .35s cubic-bezier(0.34,1.56,0.64,1);z-index:999;box-shadow:0 10px 40px rgba(0,0,0,0.5);}
+  .toast.show{transform:translateX(-50%) translateY(0);}
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="logo">TX</div>
+  <div><h1>Trade Terminal</h1><div class="tag">TP LOCK · LIVE</div></div>
+  <div class="conn" id="conn"><span class="dot"></span><span id="connTxt">PRICE…</span></div>
+</div>
+<div class="ticker">
+  <div><div class="sym" id="tkSym">— — —</div><div class="px stale" id="tkPx">----.--</div></div>
+  <div class="meta" id="tkMeta"><div class="waiting">loading price…</div></div>
+</div>
+<div class="recall" id="recall"><div class="txt" id="recallTxt"></div><button onclick="recallLast()">Recall</button></div>
+<div class="card">
+  <div class="label">Direction</div>
+  <div class="dir-row">
+    <button class="dir-btn buy" id="buyBtn" onclick="setDir('BUY')"><span class="ic">▲</span>BUY</button>
+    <button class="dir-btn sell" id="sellBtn" onclick="setDir('SELL')"><span class="ic">▼</span>SELL</button>
+  </div>
+</div>
+<div class="card">
+  <div class="field">
+    <div class="label">Lot Size</div>
+    <div class="inwrap">
+      <input type="number" id="lots" placeholder="0.01" step="0.01" min="0.01" inputmode="decimal" oninput="refresh()">
+      <span class="suffix">lots</span>
+    </div>
+    <div class="qp">
+      <button onclick="setLots(0.01)">0.01</button><button onclick="setLots(0.05)">0.05</button>
+      <button onclick="setLots(0.10)">0.10</button><button onclick="setLots(0.50)">0.50</button>
+      <button onclick="setLots(1.00)">1.00</button>
+    </div>
+    <div class="field-err" id="lotsErr">Enter a valid lot size</div>
+  </div>
+  <div class="sdiv" style="margin:14px 0"></div>
+  <div class="field" style="margin-bottom:0">
+    <div class="label">Number of Trades <span style="color:var(--sub2)">· same settings</span></div>
+    <div class="stepper">
+      <button class="minus" onclick="bumpCount(-1)">−</button>
+      <input type="number" id="count" value="1" min="1" max="20" inputmode="numeric" oninput="refresh()">
+      <button class="plus" onclick="bumpCount(1)">+</button>
+    </div>
+  </div>
+</div>
+<div class="card">
+  <div class="field" style="margin-bottom:0">
+    <div class="label">Stop Loss <span style="color:var(--sub2)">· price</span></div>
+    <input type="number" id="sl" placeholder="e.g. 4490.00" step="0.001" inputmode="decimal" oninput="refresh()">
+    <div class="hint ok" id="slHint"></div>
+    <div class="field-err" id="slErr">Enter a valid stop loss</div>
+  </div>
+</div>
+<div class="card">
+  <div class="tp-head">
+    <div class="label" style="margin-bottom:0">Take Profit Ladder</div>
+    <div class="tp-count" id="tpCount">0 / 8</div>
+  </div>
+  <div class="pips" id="pips"></div>
+  <div class="ladder-inputs">
+    <div class="li-field">
+      <div class="li-label">Starting TP (TP1)</div>
+      <input type="number" id="startTP" placeholder="e.g. 4528.00" step="0.001" inputmode="decimal" oninput="refresh()">
+    </div>
+    <div class="li-field">
+      <div class="li-label">Spacing ($)</div>
+      <input type="number" id="spacing" placeholder="3.0" step="0.1" inputmode="decimal" value="3.0" oninput="refresh()">
+    </div>
+  </div>
+  <div class="ladder-preview" id="ladderPreview"></div>
+  <div class="field-err" id="tpErr" style="margin-top:9px">Enter a starting TP</div>
+</div>
+<div class="summary" id="summary">
+  <div class="label">Order Preview</div>
+  <div class="srow"><span class="k">Direction</span><span class="v" id="sDir">—</span></div>
+  <div class="srow"><span class="k">Lot Size</span><span class="v" id="sLots">—</span></div>
+  <div class="srow"><span class="k">Trades</span><span class="v" id="sCount">—</span></div>
+  <div class="srow"><span class="k">Stop Loss</span><span class="v" id="sSl">—</span></div>
+  <div class="sdiv"></div>
+  <div class="srow"><span class="k">TP Levels</span><span class="v" id="sTps">—</span></div>
+</div>
+<button class="submit idle" id="submit" onclick="submitTrade()">SELECT DIRECTION</button>
+<div class="toast" id="toast"></div>
+<script>
+  const tg=window.Telegram.WebApp; tg.ready(); tg.expand();
+  try{tg.setHeaderColor('#06080f');tg.setBackgroundColor('#06080f');}catch(e){}
+
+  // ════════ CONFIG ════════
+  // ── Firebase Realtime DB relay (same base in EA) ──
+  // Format: https://YOUR-PROJECT-default-rtdb.firebaseio.com/SECRETPATH
+  const FB_BASE='https://tp-lock-default-rtdb.firebaseio.com/mt5-tplock-x7k2p9';
+  const FB_ORDER=FB_BASE+'/order.json';
+  const FB_PRICE=FB_BASE+'/price.json';
+  const LS_KEY='tx_last_order_v1';
+
+  let direction=null;
+  let live={bid:null,ask:null,digits:3,point:0.001,stops:0,sym:'',ts:0};
+  let lastPx=null;
+
+  const pips=document.getElementById('pips');
+  for(let i=1;i<=8;i++){
+    const p=document.createElement('div');p.className='pip';p.id=`pip${i}`;pips.appendChild(p);
+  }
+
+  // Build the 8 TP prices from Starting TP + spacing + direction.
+  // Returns array of 8 numbers (0 if not computable).
+  function computeTPs(){
+    const start=parseFloat(document.getElementById('startTP').value);
+    const sp=parseFloat(document.getElementById('spacing').value);
+    const out=[0,0,0,0,0,0,0,0];
+    if(isNaN(start)||start<=0||isNaN(sp)||sp<=0||!direction) return out;
+    for(let i=0;i<8;i++){
+      out[i]= direction==='BUY' ? start + i*sp : start - i*sp;
+      if(out[i]<=0) out[i]=0;
+    }
+    return out;
+  }
+
+  let priceTried=false;
+  async function pollPriceOnce(){
+    try{
+      const ctrl=new AbortController();
+      const to=setTimeout(()=>ctrl.abort(),3500);
+      const r=await fetch(FB_PRICE,{signal:ctrl.signal});
+      clearTimeout(to);
+      const d=await r.json();
+      if(!d||!d.msg) return false;
+      const f=d.msg.split('|');
+      if(f[0]!=='PRICE') return false;
+      live.sym=f[1];live.bid=parseFloat(f[2]);live.ask=parseFloat(f[3]);
+      live.digits=parseInt(f[4]);live.point=parseFloat(f[5]);live.stops=parseInt(f[6]);
+      live.ts=Date.now();setConn(true);renderTicker();try{refresh();}catch(e){}
+      return true;
+    }catch(e){ return false; }
+  }
+  async function connectPrice(){
+    const ok=await pollPriceOnce();
+    priceTried=true;
+    if(!ok) setConn(false);
+    setInterval(pollPriceOnce, 2500);
+  }
+  function setConn(ok){
+    const c=document.getElementById('conn');c.classList.toggle('live',ok);
+    document.getElementById('connTxt').textContent=ok?'PRICE LIVE':'PRICE N/A';
+    if(!ok && priceTried){
+      const m=document.getElementById('tkMeta');
+      if(m && !live.bid) m.innerHTML='<div class="waiting">price feed blocked —<br>trading still works ✓</div>';
+    }
+  }
+  function renderTicker(){
+    document.getElementById('tkSym').textContent=live.sym||'— — —';
+    const px=document.getElementById('tkPx'),mid=(live.bid+live.ask)/2;
+    px.textContent=mid.toFixed(live.digits);px.classList.remove('stale');
+    if(lastPx!==null){px.classList.toggle('up',mid>lastPx);px.classList.toggle('down',mid<lastPx);}
+    lastPx=mid;
+    document.getElementById('tkMeta').innerHTML=
+      `<div class="bidask">B ${live.bid.toFixed(live.digits)} / A ${live.ask.toFixed(live.digits)}</div>`+
+      `<div>min stop: ${live.stops}pt</div>`;
+  }
+  setInterval(()=>{if(live.ts&&Date.now()-live.ts>8000){setConn(false);document.getElementById('tkPx').classList.add('stale');}},2000);
+
+  function setDir(d){direction=d;
+    document.getElementById('buyBtn').classList.toggle('on',d==='BUY');
+    document.getElementById('sellBtn').classList.toggle('on',d==='SELL');refresh();}
+  function setLots(v){document.getElementById('lots').value=v;refresh();}
+  function bumpCount(n){const el=document.getElementById('count');
+    let v=(parseInt(el.value)||1)+n;v=Math.max(1,Math.min(20,v));el.value=v;refresh();}
+  function minDist(){return (live.stops||0)*(live.point||0)+(live.point||0);}
+
+  function checkSide(price,isStop){
+    if(live.bid===null||!direction)return{state:'none',msg:''};
+    const px=direction==='BUY'?live.ask:live.bid,md=minDist();
+    if(direction==='BUY'){
+      if(isStop){
+        if(price>=px)return{state:'bad',msg:'⚠ SL must be BELOW '+px.toFixed(live.digits)};
+        if(px-price<md)return{state:'bad',msg:'⚠ too close (min '+md.toFixed(live.digits)+')'};
+        return{state:'ok',msg:'✓ '+(px-price).toFixed(live.digits)+' below price'};
+      }else{
+        if(price<=px)return{state:'bad',msg:'⚠ TP must be ABOVE price'};
+        if(price-px<md)return{state:'bad',msg:'⚠ too close'};
+        return{state:'good',msg:'✓'};
+      }
+    }else{
+      if(isStop){
+        if(price<=px)return{state:'bad',msg:'⚠ SL must be ABOVE '+px.toFixed(live.digits)};
+        if(price-px<md)return{state:'bad',msg:'⚠ too close (min '+md.toFixed(live.digits)+')'};
+        return{state:'ok',msg:'✓ '+(price-px).toFixed(live.digits)+' above price'};
+      }else{
+        if(price>=px)return{state:'bad',msg:'⚠ TP must be BELOW price'};
+        if(px-price<md)return{state:'bad',msg:'⚠ too close'};
+        return{state:'good',msg:'✓'};
+      }
+    }
+  }
+
+  function refresh(){
+   try{
+    const tps=computeTPs();
+    let n=tps.filter(x=>x>0).length;
+    for(let i=1;i<=8;i++){const pe=document.getElementById('pip'+i);if(pe)pe.classList.toggle('on', tps[i-1]>0);}
+    const prev=document.getElementById('ladderPreview');
+    if(prev){
+      let html='';
+      for(let i=0;i<8;i++){
+        const v=tps[i];
+        const bad = v>0 && checkSide(v,false).state==='bad';
+        html+=`<div class="lp-chip ${v>0?'set':''}" style="${bad?'border-color:var(--sell);color:var(--sell)':''}"><b>TP${i+1}</b>${v>0?v.toFixed(live.digits||2):'—'}</div>`;
+      }
+      prev.innerHTML=html;
+    }
+    const tc=document.getElementById('tpCount');if(tc)tc.textContent=n+' / 8';
+    const sl=parseFloat(document.getElementById('sl').value),slHint=document.getElementById('slHint');
+    if(slHint){
+      if(!isNaN(sl)&&sl>0){const c=checkSide(sl,true);slHint.textContent=c.msg;
+        slHint.className='hint '+(c.state==='bad'?'bad':c.state==='ok'?'good':'ok');}
+      else{slHint.textContent='';slHint.className='hint ok';}
+    }
+    updateSummary(tps,n);updateSubmit(tps);
+   }catch(e){ /* never let a UI refresh error kill the price loop */ }
+  }
+  function updateSummary(tps,n){
+    const lots=parseFloat(document.getElementById('lots').value),
+      sl=parseFloat(document.getElementById('sl').value),
+      cnt=parseInt(document.getElementById('count').value)||1,
+      ready=direction&&lots>0&&sl>0&&n>0;
+    document.getElementById('summary').classList.toggle('show',!!ready);
+    if(!ready)return;
+    const dEl=document.getElementById('sDir');dEl.textContent=direction;
+    dEl.className='v '+(direction==='BUY'?'buy':'sell');
+    document.getElementById('sLots').textContent=lots+' lots';
+    document.getElementById('sCount').textContent=cnt+(cnt>1?' trades':' trade');
+    document.getElementById('sSl').textContent=sl.toFixed(live.digits||2);
+    document.getElementById('sTps').textContent=tps.filter(x=>x>0).map(x=>x.toFixed(live.digits||2)).join('  ');
+  }
+  function updateSubmit(tps){
+    const btn=document.getElementById('submit'),
+      lots=parseFloat(document.getElementById('lots').value),
+      sl=parseFloat(document.getElementById('sl').value),tp1=tps[0],
+      ready=direction&&lots>0&&sl>0&&tp1>0,
+      cnt=parseInt(document.getElementById('count').value)||1;
+    btn.className='submit '+(!ready?'idle':direction==='BUY'?'buy':'sell');
+    btn.textContent=!direction?'SELECT DIRECTION':!ready?'FILL REQUIRED FIELDS':
+      `▶  PLACE ${cnt>1?cnt+'× ':''}${direction}`;
+  }
+  function validate(){
+    let ok=true;
+    const lots=parseFloat(document.getElementById('lots').value),
+      sl=parseFloat(document.getElementById('sl').value),
+      tps=computeTPs(), tp1=tps[0];
+    document.getElementById('lotsErr').classList.toggle('show',!(lots>0));
+    document.getElementById('slErr').classList.toggle('show',!(sl>0));
+    document.getElementById('tpErr').classList.toggle('show',!(tp1>0));
+    if(!(lots>0)||!(sl>0)||!(tp1>0))ok=false;
+    if(!direction){showToast('❗ Choose BUY or SELL');ok=false;}
+    if(ok&&live.bid!==null){
+      const slc=checkSide(sl,true);
+      if(slc.state==='bad'){showToast('❌ Stop loss: '+slc.msg.replace('⚠ ',''));return false;}
+      for(let i=0;i<8;i++){
+        const v=tps[i];
+        if(v>0){const c=checkSide(v,false);
+          if(c.state==='bad'){showToast(`❌ TP${i+1} on wrong side of price`);return false;}}
+      }
+    }
+    return ok;
+  }
+  async function submitTrade(){
+    if(!validate())return;
+    const tps=computeTPs();
+    const lots=parseFloat(document.getElementById('lots').value),
+      sl=parseFloat(document.getElementById('sl').value),
+      cnt=parseInt(document.getElementById('count').value)||1,
+      startTP=parseFloat(document.getElementById('startTP').value),
+      spacing=parseFloat(document.getElementById('spacing').value);
+    const msg=`TRADE|${direction}|${lots}|${sl}|${cnt}|${tps.join('|')}`;
+    saveLast({direction,lots,sl,cnt,tps,startTP,spacing});
+    try{
+      const body=JSON.stringify({msg:msg,seq:Date.now()});
+      const res=await fetch(FB_ORDER,{method:'POST',body:body});
+      if(res.ok){showToast(`✅ ${cnt>1?cnt+' orders':'Order'} sent!`);setTimeout(()=>tg.close(),1200);}
+      else showToast('❌ Relay error '+res.status);
+    }catch(e){showToast('❌ Network error');}
+  }
+  function saveLast(o){try{localStorage.setItem(LS_KEY,JSON.stringify(o));}catch(e){}}
+  function loadLast(){try{return JSON.parse(localStorage.getItem(LS_KEY));}catch(e){return null;}}
+  function showRecall(){
+    const o=loadLast();if(!o)return;
+    document.getElementById('recallTxt').innerHTML=
+      `Last: <b>${o.direction}</b> · <b>${o.lots}</b> lots · ${o.tps.filter(x=>x>0).length} TPs`;
+    document.getElementById('recall').classList.add('show');
+  }
+  function recallLast(){
+    const o=loadLast();if(!o)return;
+    setDir(o.direction);
+    document.getElementById('lots').value=o.lots;
+    document.getElementById('sl').value=o.sl;
+    document.getElementById('count').value=o.cnt||1;
+    if(o.startTP) document.getElementById('startTP').value=o.startTP;
+    if(o.spacing) document.getElementById('spacing').value=o.spacing;
+    refresh();showToast('↺ Last settings loaded');
+    document.getElementById('recall').classList.remove('show');
+  }
+  connectPrice();showRecall();refresh();
+</script>
+</body>
 </html>
