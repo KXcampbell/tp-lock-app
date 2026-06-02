@@ -266,7 +266,7 @@
       if(f[0]!=='PRICE') return false;
       live.sym=f[1];live.bid=parseFloat(f[2]);live.ask=parseFloat(f[3]);
       live.digits=parseInt(f[4]);live.point=parseFloat(f[5]);live.stops=parseInt(f[6]);
-      live.ts=Date.now();renderTicker();refresh();setConn(true);
+      live.ts=Date.now();setConn(true);renderTicker();try{refresh();}catch(e){}
       return true;
     }catch(e){ return false; }
   }
@@ -331,25 +331,29 @@
   }
 
   function refresh(){
+   try{
     const tps=computeTPs();
     let n=tps.filter(x=>x>0).length;
-    // pips
-    for(let i=1;i<=8;i++) document.getElementById('pip'+i).classList.toggle('on', tps[i-1]>0);
-    // preview chips
+    for(let i=1;i<=8;i++){const pe=document.getElementById('pip'+i);if(pe)pe.classList.toggle('on', tps[i-1]>0);}
     const prev=document.getElementById('ladderPreview');
-    let html='';
-    for(let i=0;i<8;i++){
-      const v=tps[i];
-      const bad = v>0 && checkSide(v,false).state==='bad';
-      html+=`<div class="lp-chip ${v>0?'set':''}" style="${bad?'border-color:var(--sell);color:var(--sell)':''}"><b>TP${i+1}</b>${v>0?v.toFixed(live.digits||2):'—'}</div>`;
+    if(prev){
+      let html='';
+      for(let i=0;i<8;i++){
+        const v=tps[i];
+        const bad = v>0 && checkSide(v,false).state==='bad';
+        html+=`<div class="lp-chip ${v>0?'set':''}" style="${bad?'border-color:var(--sell);color:var(--sell)':''}"><b>TP${i+1}</b>${v>0?v.toFixed(live.digits||2):'—'}</div>`;
+      }
+      prev.innerHTML=html;
     }
-    prev.innerHTML=html;
-    document.getElementById('tpCount').textContent=n+' / 8';
+    const tc=document.getElementById('tpCount');if(tc)tc.textContent=n+' / 8';
     const sl=parseFloat(document.getElementById('sl').value),slHint=document.getElementById('slHint');
-    if(!isNaN(sl)&&sl>0){const c=checkSide(sl,true);slHint.textContent=c.msg;
-      slHint.className='hint '+(c.state==='bad'?'bad':c.state==='ok'?'good':'ok');}
-    else{slHint.textContent='';slHint.className='hint ok';}
+    if(slHint){
+      if(!isNaN(sl)&&sl>0){const c=checkSide(sl,true);slHint.textContent=c.msg;
+        slHint.className='hint '+(c.state==='bad'?'bad':c.state==='ok'?'good':'ok');}
+      else{slHint.textContent='';slHint.className='hint ok';}
+    }
     updateSummary(tps,n);updateSubmit(tps);
+   }catch(e){ /* never let a UI refresh error kill the price loop */ }
   }
   function updateSummary(tps,n){
     const lots=parseFloat(document.getElementById('lots').value),
