@@ -95,6 +95,31 @@
     border-radius:7px;background:var(--surface2);border:1px solid var(--border);color:var(--sub);}
   .lp-chip b{display:block;font-size:9px;color:var(--gold);margin-bottom:2px;}
   .lp-chip.set{color:var(--text);border-color:var(--gold-dim);}
+  /* ===== Exit-mode switch — deliberately loud so you can't mis-set it ===== */
+  .mode-switch{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+  .mode-opt{display:flex;flex-direction:column;gap:3px;padding:13px 8px;border-radius:11px;
+    border:2px solid var(--border2);background:var(--surface2);cursor:pointer;text-align:center;
+    transition:all .18s;}
+  .mode-title{font-family:var(--mono);font-size:13px;font-weight:700;letter-spacing:1px;color:var(--sub);}
+  .mode-sub{font-size:9px;color:var(--sub2);line-height:1.25;}
+  .mode-opt.active{transform:translateY(-1px);}
+  /* CLASSIC active = cool blue/steel */
+  #modeClassic.active{border-color:var(--accent);background:rgba(77,140,255,0.14);
+    box-shadow:0 0 22px rgba(77,140,255,0.30),inset 0 0 18px rgba(77,140,255,0.05);}
+  #modeClassic.active .mode-title{color:var(--accent);}
+  #modeClassic.active .mode-sub{color:#9fc0ff;}
+  /* HYBRID active = hot gold/amber, clearly different */
+  #modeHybrid.active{border-color:var(--gold);background:rgba(255,204,77,0.16);
+    box-shadow:0 0 22px rgba(255,204,77,0.34),inset 0 0 18px rgba(255,204,77,0.06);}
+  #modeHybrid.active .mode-title{color:var(--gold);}
+  #modeHybrid.active .mode-sub{color:#ffe09a;}
+  .mode-banner{margin-top:10px;padding:8px 10px;border-radius:8px;font-family:var(--mono);
+    font-size:11px;text-align:center;font-weight:600;letter-spacing:.5px;}
+  .mode-banner.classic{background:rgba(77,140,255,0.12);color:var(--accent);border:1px solid rgba(77,140,255,0.3);}
+  .mode-banner.hybrid{background:rgba(255,204,77,0.13);color:var(--gold);border:1px solid rgba(255,204,77,0.35);}
+  /* whole card glows by mode so the change is unmissable */
+  #modeCard.is-hybrid{border-color:rgba(255,204,77,0.45);box-shadow:0 0 0 1px rgba(255,204,77,0.25),0 8px 30px rgba(255,204,77,0.10);}
+  #modeCard.is-classic{border-color:rgba(77,140,255,0.4);box-shadow:0 0 0 1px rgba(77,140,255,0.2);}
   .pips{display:flex;gap:4px;margin-bottom:12px;}
   .pip{flex:1;height:3px;border-radius:2px;background:var(--border);transition:all .25s;}
   .pip.on{background:var(--gold);box-shadow:0 0 6px rgba(255,204,77,0.4);}
@@ -180,6 +205,20 @@
     </div>
   </div>
 </div>
+<div class="card" id="modeCard">
+  <div class="label" style="margin-bottom:9px">Exit Mode</div>
+  <div class="mode-switch">
+    <button class="mode-opt active" id="modeClassic" onclick="setMode('CLASSIC')">
+      <span class="mode-title">CLASSIC</span>
+      <span class="mode-sub">100% tight ladder · banks fast</span>
+    </button>
+    <button class="mode-opt" id="modeHybrid" onclick="setMode('HYBRID')">
+      <span class="mode-title">70/30 HYBRID</span>
+      <span class="mode-sub">70% banks · 30% rides to BE+ runner</span>
+    </button>
+  </div>
+  <div class="mode-banner" id="modeBanner"></div>
+</div>
 <div class="card">
   <div class="field" style="margin-bottom:0">
     <div class="label">Stop Loss <span style="color:var(--sub2)">· price</span></div>
@@ -201,7 +240,7 @@
     </div>
     <div class="li-field">
       <div class="li-label">Spacing ($)</div>
-      <input type="number" id="spacing" placeholder="3.0" step="0.1" inputmode="decimal" value="3.0" oninput="refresh()">
+      <input type="number" id="spacing" placeholder="2.0" step="0.1" inputmode="decimal" value="2.0" oninput="refresh()">
     </div>
   </div>
   <div class="ladder-preview" id="ladderPreview"></div>
@@ -231,6 +270,7 @@
   const LS_KEY='tx_last_order_v1';
 
   let direction=null;
+  let exitMode='CLASSIC';
   let live={bid:null,ask:null,digits:3,point:0.001,stops:0,sym:'',ts:0};
   let lastPx=null;
 
@@ -299,6 +339,19 @@
   function setDir(d){direction=d;
     document.getElementById('buyBtn').classList.toggle('on',d==='BUY');
     document.getElementById('sellBtn').classList.toggle('on',d==='SELL');refresh();}
+  function setMode(m){
+    exitMode=m;
+    const isH=m==='HYBRID';
+    document.getElementById('modeClassic').classList.toggle('active',!isH);
+    document.getElementById('modeHybrid').classList.toggle('active',isH);
+    const card=document.getElementById('modeCard');
+    card.classList.toggle('is-hybrid',isH); card.classList.toggle('is-classic',!isH);
+    const b=document.getElementById('modeBanner');
+    if(isH){ b.className='mode-banner hybrid';
+      b.textContent='⚡ HYBRID — sends 2 positions: 70% banker + 30% runner'; }
+    else{ b.className='mode-banner classic';
+      b.textContent='● CLASSIC — single position, tight ladder'; }
+  }
   function setLots(v){document.getElementById('lots').value=v;refresh();}
   function bumpCount(n){const el=document.getElementById('count');
     let v=(parseInt(el.value)||1)+n;v=Math.max(1,Math.min(20,v));el.value=v;refresh();}
@@ -414,12 +467,12 @@
       cnt=parseInt(document.getElementById('count').value)||1,
       startTP=parseFloat(document.getElementById('startTP').value),
       spacing=parseFloat(document.getElementById('spacing').value);
-    const msg=`TRADE|${direction}|${lots}|${sl}|${cnt}|${tps.join('|')}`;
-    saveLast({direction,lots,sl,cnt,tps,startTP,spacing});
+    const msg=`TRADE|${direction}|${lots}|${sl}|${cnt}|${tps.join('|')}|MODE=${exitMode}`;
+    saveLast({direction,lots,sl,cnt,tps,startTP,spacing,exitMode});
     try{
       const body=JSON.stringify({msg:msg,seq:Date.now()});
       const res=await fetch(FB_ORDER,{method:'POST',body:body});
-      if(res.ok){showToast(`✅ ${cnt>1?cnt+' orders':'Order'} sent!`+(skipped>0?` (${skipped} passed TP${skipped>1?'s':''} skipped)`:''));setTimeout(()=>tg.close(),1200);}
+      if(res.ok){showToast(`✅ ${exitMode==='HYBRID'?'HYBRID ':''}${cnt>1?cnt+' orders':'Order'} sent!`+(skipped>0?` (${skipped} passed TP${skipped>1?'s':''} skipped)`:''));setTimeout(()=>tg.close(),1200);}
       else showToast('❌ Relay error '+res.status);
     }catch(e){showToast('❌ Network error');}
   }
@@ -439,10 +492,11 @@
     document.getElementById('count').value=o.cnt||1;
     if(o.startTP) document.getElementById('startTP').value=o.startTP;
     if(o.spacing) document.getElementById('spacing').value=o.spacing;
+    setMode(o.exitMode||'CLASSIC');
     refresh();showToast('↺ Last settings loaded');
     document.getElementById('recall').classList.remove('show');
   }
-  connectPrice();showRecall();refresh();
+  setMode('CLASSIC');connectPrice();showRecall();refresh();
 </script>
 </body>
 </html>
