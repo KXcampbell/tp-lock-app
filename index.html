@@ -95,6 +95,13 @@
     border-radius:7px;background:var(--surface2);border:1px solid var(--border);color:var(--sub);}
   .lp-chip b{display:block;font-size:9px;color:var(--gold);margin-bottom:2px;}
   .lp-chip.set{color:var(--text);border-color:var(--gold-dim);}
+  .roomcheck{margin-top:10px;padding:9px 11px;border-radius:9px;font-family:var(--mono);
+    font-size:11px;line-height:1.5;border:1px solid var(--border);background:var(--surface2);}
+  .roomcheck.good{border-color:rgba(45,212,140,0.4);background:rgba(45,212,140,0.08);}
+  .roomcheck.warn{border-color:rgba(255,176,32,0.45);background:rgba(255,176,32,0.10);}
+  .roomcheck.bad{border-color:rgba(255,68,106,0.5);background:rgba(255,68,106,0.10);}
+  .roomcheck .rc-head{font-weight:700;letter-spacing:.5px;margin-bottom:3px;}
+  .roomcheck .rc-tps{color:var(--sub);font-size:10px;}
   /* ===== Exit-mode switch — deliberately loud so you can't mis-set it ===== */
   .mode-switch{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
   .mode-opt{display:flex;flex-direction:column;gap:3px;padding:13px 8px;border-radius:11px;
@@ -244,6 +251,7 @@
     </div>
   </div>
   <div class="ladder-preview" id="ladderPreview"></div>
+  <div class="roomcheck" id="roomCheck"></div>
   <div class="field-err" id="tpErr" style="margin-top:9px">Enter a starting TP</div>
 </div>
 <div class="summary" id="summary">
@@ -397,6 +405,27 @@
         html+=`<div class="lp-chip ${v>0?'set':''}" style="${passed?'opacity:.4;text-decoration:line-through':''}"><b>TP${i+1}${passed?' ✓':''}</b>${v>0?v.toFixed(live.digits||2):'—'}</div>`;
       }
       prev.innerHTML=html;
+    }
+    // ----- ROOM CHECK: distance from live price to your TP1 (provider TP3) -----
+    const rc=document.getElementById('roomCheck');
+    if(rc){
+      const tp1=tps[0];
+      if(tp1>0 && live.bid!==null && direction){
+        const px = direction==='BUY'? live.ask : live.bid;
+        const room = direction==='BUY' ? (tp1-px) : (px-tp1);   // $ left to your first target
+        let cls,head;
+        if(room<0){ cls='bad'; head='⛔ TP1 ALREADY PASSED — move spent'; }
+        else if(room<2){ cls='bad'; head=`⛔ LOW ROOM $${room.toFixed(2)} — likely spent, consider skip`; }
+        else if(room<4){ cls='warn'; head=`⚠ TIGHT $${room.toFixed(2)} to TP1 — late-ish entry`; }
+        else{ cls='good'; head=`✓ GOOD $${room.toFixed(2)} room to TP1`; }
+        // hit-rate reference (from your 20-signal study; crash-regime, treat as guide)
+        const hr='Hit-rates(study): TP1 100% · TP3 95% · TP5 70% · TP8 60%';
+        rc.className='roomcheck '+cls;
+        rc.innerHTML=`<div class="rc-head">${head}</div><div class="rc-tps">${hr}</div>`;
+      } else {
+        rc.className='roomcheck';
+        rc.innerHTML='<div class="rc-tps">Enter direction + starting TP to see room-to-TP1 check</div>';
+      }
     }
     const tc=document.getElementById('tpCount');if(tc)tc.textContent=n+' / 8';
     const sl=parseFloat(document.getElementById('sl').value),slHint=document.getElementById('slHint');
